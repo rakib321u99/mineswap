@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MineSwap Admin</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tabs button { flex: 1; min-width: 90px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); cursor: pointer; font-weight: 700; }
+  .tabs button.active { background: var(--green); color: #04140a; border-color: var(--green); }
+  .wd { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; background: var(--panel); }
+  .wd code { word-break: break-all; }
+  select { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg2); color: var(--text); }
+  textarea { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg2); color: var(--text); min-height: 90px; font-family: inherit; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header><div class="logo">🛠️ Mine<span>Swap</span> Admin</div></header>
+
+  <div id="login-box" class="card">
+    <h2>Admin sign in</h2>
+    <p class="muted">Use the admin password set in the environment (ADMIN_PASSWORD).</p>
+    <label for="pw">Password</label>
+    <input type="password" id="pw" placeholder="••••••••" autocomplete="current-password">
+    <button class="btn mt" id="btn-login">Sign in</button>
+    <p class="muted mt" id="login-err"></p>
+  </div>
+
+  <div id="panel" class="hidden">
+    <div class="tabs">
+      <button data-t="overview" class="active">Overview</button>
+      <button data-t="withdrawals">Withdrawals</button>
+      <button data-t="users">Users</button>
+      <button data-t="settings">Settings</button>
+      <button data-t="post">Daily Post</button>
+    </div>
+
+    <section id="t-overview">
+      <div class="card"><div class="grid2" id="stats-grid"></div></div>
+      <button class="btn ghost" id="btn-refresh-stats">↻ Refresh</button>
+    </section>
+
+    <section id="t-withdrawals" class="hidden">
+      <div class="card">
+        <div class="row">
+          <h2>Withdrawals</h2>
+          <select id="wd-filter" style="width:auto">
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        <div id="wd-list" class="mt">Loading…</div>
+      </div>
+    </section>
+
+    <section id="t-users" class="hidden">
+      <div class="card">
+        <h2>Users</h2>
+        <div class="row">
+          <input type="text" id="user-q" placeholder="Search Telegram ID or username">
+          <button class="btn small" id="btn-user-search">Search</button>
+        </div>
+        <div id="user-list" class="mt">Loading…</div>
+      </div>
+    </section>
+
+    <section id="t-settings" class="hidden">
+      <div class="card">
+        <h2>Settings</h2>
+        <p class="muted">Changes apply within ~1 minute. Rates are in MINE; prices in nanoTON (1 TON = 1,000,000,000).</p>
+        <div id="settings-form"></div>
+        <button class="btn mt" id="btn-save-settings">💾 Save settings</button>
+      </div>
+    </section>
+
+    <section id="t-post" class="hidden">
+      <div class="card">
+        <h2>📣 Publish today's channel post</h2>
+        <p class="muted">Posts to @<span id="post-channel">F67Drop</span> with an inline 👍 Like button. The link is saved as today's post for the Tasks tab.</p>
+        <label for="post-text">Post text (HTML allowed)</label>
+        <textarea id="post-text" placeholder="⛏️ MineSwap daily update…"></textarea>
+        <button class="btn mt" id="btn-publish">📣 Publish to channel</button>
+        <p class="muted mt" id="post-result"></p>
+      </div>
+    </section>
+  </div>
+</div>
+<div id="toast"></div>
+<script>
+const $ = (id) => document.getElementById(id);
+let token = sessionStorage.getItem('ms_admin_token') || '';
+const fmt = (n) => Number(n || 0).toLocaleString('en-US');
+
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+async function api(action, params = {}) {
+  const res = await fetch('/api/admin', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, token, ...params }),
+  });
+  return res.json();
+}
+function showPanel() {
+  $('login-box').classList.add('hidden');
+  $('panel').classList.remove('hidden');
+  loadStats(); loadWithdrawals(); loadUsers(); loadSettings();
+}
+$('btn-login').addEventListener('click', async () => {
+  const r = await api('login', { password: $('pw').value });
+  if (r.ok) { token = r.token; sessionStorage.setItem('ms_admin_token', token); showPanel(); }
+  else $('login-err').textContent = 'Wrong password.';
+});
+$('pw').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-login').click(); });
+if (token) showPanel();
+
+document.querySelectorAll('.tabs button').forEach((b) => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach((x) => x.classList.remove('active'));
+    b.classList.add('active');
+    ['overview', 'withdrawals', 'users', 'settings', 'post'].forEach((t) => {
+      $('t-' + t).classList.toggle('hidden', t !== b.dataset.t);
+    });
+  });
+});
+
+async function loadStats() {
+  const r = await api('stats');
+  if (!r.ok) return;
+  $('stats-grid').innerHTML = [
+    ['Users', fmt(r.totalUsers)], ['Mining now', fmt(r.miningActive)],
+    ['Pending swaps', `${fmt(r.pendingWithdrawals)} (${fmt(r.pendingMine)} MINE)`],
+    ['Approved swaps', `${fmt(r.approvedWithdrawals)} (${fmt(r.approvedMine)} MINE)`],
+    ['Price', (r.priceNano / 1e9).toFixed(6) + ' TON'],
+    ['24h volume', fmt(r.vol24Mine) + ' MINE'],
+    ['Ad views today', fmt(r.adViewsToday)],
+  ].map(([k, v]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+}
+$('btn-refresh-stats').addEventListener('click', loadStats);
+
+async function loadWithdrawals() {
+  const status = $('wd-filter').value;
+  const r = await api('withdrawals', { status });
+  if (!r.ok) { $('wd-list').textContent = 'Failed to load.'; return; }
+  $('wd-list').innerHTML = r.withdrawals.length ? r.withdrawals.map((w) => `
+    <div class="wd">
+      <div class="row"><b>#${w.id} — ${fmt(w.mineAmount)} MINE → ${w.ton} TON</b><span class="badge ${w.status === 'approved' ? '' : w.status === 'rejected' ? 'bad' : 'warn'}">${w.status}</span></div>
+      <div class="muted">User ${w.tgId} (@${w.username || '-'}) · ${w.createdAt}</div>
+      <div class="muted">Wallet: <code>${w.wallet}</code></div>
+      ${w.proof ? `<div class="muted">Proof: ${w.proof}</div>` : ''}
+      ${w.note ? `<div class="muted">Note: ${w.note}</div>` : ''}
+      ${w.status === 'pending' ? `
+        <div class="row mt">
+          <input type="text" id="proof-${w.id}" placeholder="Proof link / tx hash (for approve)">
+        </div>
+        <div class="row mt">
+          <button class="btn small" onclick="decide(${w.id}, true)">✅ Approve (paid)</button>
+          <button class="btn small danger" onclick="decide(${w.id}, false)">❌ Reject &amp; refund</button>
+        </div>
+        <input type="text" id="reason-${w.id}" placeholder="Reject reason (shown to user)" class="mt">` : ''}
+    </div>`).join('') : 'No withdrawals with this status.';
+}
+$('wd-filter').addEventListener('change', loadWithdrawals);
+
+async function decide(id, approve) {
+  if (approve) {
+    const proof = ($('proof-' + id) || {}).value || '';
+    if (!confirm(`Approve swap #${id}? Confirm you already sent the TON.`)) return;
+    const r = await api('withdrawal_approve', { id, proof });
+    if (r.ok) { toast('Approved.'); loadWithdrawals(); loadStats(); } else toast(r.error || 'Failed.');
+  } else {
+    const reason = ($('reason-' + id) || {}).value || 'Rejected by admin';
+    if (!confirm(`Reject swap #${id} and refund the MINE?`)) return;
+    const r = await api('withdrawal_reject', { id, reason });
+    if (r.ok) { toast('Rejected & refunded.'); loadWithdrawals(); loadStats(); } else toast(r.error || 'Failed.');
+  }
+}
+
+async function loadUsers() {
+  const r = await api('users', { q: $('user-q').value.trim() });
+  if (!r.ok) return;
+  $('user-list').innerHTML = r.users.length ? r.users.map((u) => `
+    <div class="item"><div><div class="t">${u.tgId} ${u.username ? '(@' + u.username + ')' : ''}</div>
+    <div class="s">${fmt(u.balanceMine)} MINE · mining: ${u.miningActive ? 'yes' : 'no'} · safety: ${u.safetyPassed ? 'yes' : 'no'}</div></div>
+    <span><button class="btn small ghost" onclick="resetCode(${u.tgId})">Reset code</button>
+    <button class="btn small ${u.banned ? '' : 'danger'}" onclick="banUser(${u.tgId}, ${u.banned ? 'false' : 'true'})">${u.banned ? 'Unban' : 'Ban'}</button></span></div>`).join('')
+    : 'No users found.';
+}
+$('btn-user-search').addEventListener('click', loadUsers);
+async function banUser(tgId, banned) {
+  const r = await api('user_ban', { tgId, banned });
+  if (r.ok) { toast(banned ? 'User banned.' : 'User unbanned.'); loadUsers(); } else toast('Failed.');
+}
+async function resetCode(tgId) {
+  if (!confirm(`Reset the safety code for ${tgId}? The new code will be sent to the user in the bot chat.`)) return;
+  const r = await api('safety_reset', { tgId });
+  if (r.ok) { toast('New code sent to the user.'); loadUsers(); } else toast('Failed.');
+}
+
+const SETTING_FIELDS = [
+  ['mining_rate_per_hour', 'Mining rate (MINE/hour)', '7'],
+  ['daily_cap_mine', 'Daily cap (MINE)', '200'],
+  ['swap_min_mine', 'Minimum swap (MINE)', '10000'],
+  ['channel_username', 'Channel username (no @)', 'F67Drop'],
+  ['channel_id', 'Channel numeric ID (optional)', ''],
+  ['ad_reward_mine', 'Ad reward (MINE)', '10'],
+  ['ad_daily_cap', 'Ad views per day', '10'],
+  ['price_floor_nano', 'Price floor (nanoTON)', '50000'],
+  ['price_cap_nano', 'Price cap (nanoTON)', '500000'],
+  ['monetag_id', 'Monetag zone ID', ''],
+  ['monetag_sdk_src', 'Monetag SDK script URL', ''],
+  ['adsterra_id', 'Adsterra placement key', ''],
+  ['adsterra_invoke_domain', 'Adsterra invoke domain', 'www.highperformanceformat.com'],
+  ['adsgram_block_id', 'Adsgram block ID', ''],
+  ['gigapub_id', 'Giga.pub project ID', ''],
+];
+async function loadSettings() {
+  const r = await api('settings_get');
+  const cur = r.ok ? r.settings : {};
+  $('settings-form').innerHTML = SETTING_FIELDS.map(([k, label, def]) => `
+    <label for="set-${k}">${label}</label>
+    <input type="text" id="set-${k}" data-key="${k}" value="${String(cur[k] ?? def).replace(/"/g, '&quot;')}">`).join('');
+}
+$('btn-save-settings').addEventListener('click', async () => {
+  for (const el of document.querySelectorAll('#settings-form input')) {
+    const r = await api('settings_set', { key: el.dataset.key, value: el.value });
+    if (!r.ok) { toast('Failed on ' + el.dataset.key); return; }
+  }
+  toast('Settings saved.');
+  loadStats();
+});
+
+$('btn-publish').addEventListener('click', async () => {
+  const text = $('post-text').value.trim();
+  if (!text) { toast('Write the post first.'); return; }
+  const r = await api('post_publish', { text });
+  if (r.ok) {
+    $('post-result').textContent = 'Published: ' + r.url;
+    $('post-text').value = '';
+    toast('Published to channel.');
+  } else toast('Publish failed: ' + (r.detail || r.error));
+});
+</script>
+</body>
+</html>
