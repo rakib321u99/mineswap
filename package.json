@@ -1,0 +1,1 @@
+{"dependencies":{"mysql2":"^3.11.0"},"description":"MineSwap — Telegram Mini App bot: mine MINE tokens, watch the simulated MINE/TON market, swap to TON (Gram). Node.js serverless on Vercel + TiDB MySQL.","engines":{"node":">=18"},"license":"UNLICENSED","name":"mineswap","private":true,"scripts":{"start":"node test/test.js","test":"node test/test.js"},"version":"1.0.0"}
