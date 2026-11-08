@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MineSwap — Mine MINE, Swap to TON</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">⛏️ Mine<span>Swap</span></div>
+    <div class="balance-pill">💰 <b id="hdr-balance">0</b> MINE</div>
+  </header>
+
+  <!-- ============ MINE ============ -->
+  <section class="panel active" id="tab-mine">
+    <div class="card">
+      <div class="row"><span class="muted">MINE Balance</span><span id="mine-like-badge"></span></div>
+      <div class="big"><span id="mine-balance">0</span> <small>MINE</small></div>
+      <div class="muted" id="mine-usd">≈ 0 TON at current price</div>
+      <div class="mt center" style="font-size:44px">⛏️</div>
+      <button class="btn mt" id="btn-start-mining">▶ Start Mining</button>
+      <button class="btn gold mt" id="btn-claim">💰 Claim</button>
+      <div class="row mt"><span class="muted">Mining rate</span><b id="mine-rate">7 MINE / hour</b></div>
+      <div class="row"><span class="muted">Accrued now</span><b id="mine-accrued">0 MINE</b></div>
+      <div class="row"><span class="muted">Claimable today</span><b id="mine-claimable">0 MINE</b></div>
+      <div class="bar"><i id="mine-day-bar" style="width:0%"></i></div>
+      <div class="muted" id="mine-day-text">0 / 200 MINE claimed today</div>
+    </div>
+    <div class="card">
+      <h3>📋 Today's requirement</h3>
+      <div class="row"><span>👍 Like today's channel post</span><span id="mine-like-status" class="badge warn">Not done</span></div>
+      <p class="muted mt">Claim needs today's Like. Open the Tasks tab to like the post.</p>
+    </div>
+    <div class="ad-slot" id="ad-banner-mine"></div>
+  </section>
+
+  <!-- ============ MARKET ============ -->
+  <section class="panel" id="tab-market">
+    <div class="card">
+      <div class="row"><span class="muted">MINE / TON</span><span id="mkt-change" class="badge">+0.00%</span></div>
+      <div class="big gold"><span id="mkt-price">0.000100</span> <small>TON</small></div>
+      <canvas id="chart" width="440" height="150"></canvas>
+      <div class="grid2 mt">
+        <div class="stat"><div class="k">24h High</div><div class="v" id="mkt-high">—</div></div>
+        <div class="stat"><div class="k">24h Low</div><div class="v" id="mkt-low">—</div></div>
+        <div class="stat"><div class="k">24h Volume</div><div class="v" id="mkt-vol">—</div></div>
+        <div class="stat"><div class="k">Your MINE value</div><div class="v gold" id="mkt-value">—</div></div>
+      </div>
+      <p class="muted mt">The price is simulated inside MineSwap — the token is not listed on a real exchange. Selling pushes the price down; holding pushes it up. Swap when the price is high to get more TON.</p>
+    </div>
+    <button class="btn ghost" id="btn-refresh-market">↻ Refresh price</button>
+  </section>
+
+  <!-- ============ SWAP ============ -->
+  <section class="panel" id="tab-swap">
+    <div class="card">
+      <h2>🔄 Swap MINE → TON (Gram)</h2>
+      <div class="row"><span class="muted">Minimum swap</span><b id="swap-min">10,000 MINE</b></div>
+      <div class="row"><span class="muted">Your balance</span><b id="swap-balance">0 MINE</b></div>
+      <div class="row"><span class="muted">Current price</span><b class="gold" id="swap-price">—</b></div>
+      <label for="swap-amount">Amount (MINE)</label>
+      <input type="number" id="swap-amount" placeholder="10000" min="10000" step="1">
+      <label for="swap-wallet">Your TON wallet address</label>
+      <input type="text" id="swap-wallet" placeholder="EQ... or UQ... (48 chars)" autocomplete="off">
+      <div class="card mt" style="background:var(--bg2)">
+        <div class="row"><span class="muted">You receive (approx.)</span><b class="gold" id="swap-quote">— TON</b></div>
+      </div>
+      <button class="btn mt" id="btn-quote">Calculate</button>
+      <button class="btn gold mt" id="btn-swap">⇄ Swap Now</button>
+      <p class="muted mt">Swap requests are paid <b>manually</b> by the admin. After you swap, the admin sends the TON to your wallet and uploads proof. Every decision is messaged to you by the bot.</p>
+    </div>
+    <div class="card">
+      <h3>🔒 Swap gates</h3>
+      <div id="swap-gates" class="muted">Loading…</div>
+    </div>
+  </section>
+
+  <!-- ============ TASKS ============ -->
+  <section class="panel" id="tab-tasks">
+    <div class="card">
+      <h2>✅ Tasks</h2>
+      <div class="task">
+        <div><span class="ic">📣</span> <b>Join the channel</b><div class="muted">Required to swap &amp; withdraw</div></div>
+        <span id="task-join-badge" class="badge warn">Check</span>
+      </div>
+      <div class="task">
+        <div><span class="ic">👍</span> <b>Like today's post</b><div class="muted">Required to claim mining</div></div>
+        <span id="task-like-badge" class="badge warn">Not done</span>
+      </div>
+      <div class="mt">
+        <button class="btn ghost" id="btn-open-post">📣 Open today's post</button>
+        <button class="btn ghost mt" id="btn-refresh-channel">↻ Re-check channel join</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>📺 Watch Ad — earn MINE</h3>
+      <div class="row"><span class="muted">Reward</span><b id="ad-reward">+10 MINE / ad</b></div>
+      <div class="row"><span class="muted">Watched today</span><b id="ad-count">0 / 10</b></div>
+      <button class="btn mt" id="btn-watch-ad">▶ Watch Ad</button>
+      <p class="muted mt">Ads run on Monetag, Adsterra, Giga.pub and Adsgram. A short math check runs before the reward is credited.</p>
+    </div>
+    <div class="ad-slot" id="ad-banner-tasks"></div>
+  </section>
+
+  <!-- ============ PROFILE ============ -->
+  <section class="panel" id="tab-profile">
+    <div class="card">
+      <h2>👤 Profile</h2>
+      <div class="row"><span class="muted">Telegram ID</span><b id="prof-tgid">—</b></div>
+      <div class="row"><span class="muted">Name</span><b id="prof-name">—</b></div>
+      <div class="row"><span class="muted">Balance</span><b class="gold" id="prof-balance">0 MINE</b></div>
+      <div class="row"><span class="muted">Safety check</span><span id="prof-safety" class="badge warn">Pending</span></div>
+    </div>
+    <div class="card">
+      <h3>🧾 Recent activity</h3>
+      <div id="prof-ledger" class="muted">Loading…</div>
+    </div>
+    <div class="card">
+      <h3>💸 My swaps</h3>
+      <div id="prof-swaps" class="muted">Loading…</div>
+    </div>
+  </section>
+</div>
+
+<nav>
+  <div class="inner">
+    <button data-tab="mine" class="active"><span class="ico">⛏️</span>Mine</button>
+    <button data-tab="market"><span class="ico">📈</span>Market</button>
+    <button data-tab="swap"><span class="ico">🔄</span>Swap</button>
+    <button data-tab="tasks"><span class="ico">✅</span>Tasks</button>
+    <button data-tab="profile"><span class="ico">👤</span>Profile</button>
+  </div>
+</nav>
+
+<!-- Safety check modal -->
+<div class="modal-back" id="modal-safety">
+  <div class="modal">
+    <h2>🔐 Quick Safety Check</h2>
+    <p class="muted">The bot sent you a 3-digit code in chat. Enter it here to start earning (+25 MINE).</p>
+    <label for="safety-code">3-digit code</label>
+    <input type="tel" id="safety-code" placeholder="123" maxlength="3" inputmode="numeric">
+    <button class="btn" id="btn-safety">Verify</button>
+    <button class="btn ghost" id="btn-safety-close">Later</button>
+  </div>
+</div>
+
+<!-- Captcha modal -->
+<div class="modal-back" id="modal-captcha">
+  <div class="modal">
+    <h2>🧮 Quick check</h2>
+    <p class="muted">Solve this to prove you're human (60 seconds, 2 tries).</p>
+    <div class="big center mt" id="captcha-question">?</div>
+    <label for="captcha-answer">Your answer</label>
+    <input type="tel" id="captcha-answer" placeholder="?" inputmode="numeric">
+    <button class="btn" id="btn-captcha">Submit</button>
+    <button class="btn ghost" id="btn-captcha-close">Cancel</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
